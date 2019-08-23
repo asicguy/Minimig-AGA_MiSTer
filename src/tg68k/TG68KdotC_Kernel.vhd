@@ -2157,8 +2157,22 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					  trap_priv <= '1';
 					  trapmake <= '1';
 					end if;
-
-				  when "1110101" => --rts
+-- RTD #<disp> - Return from Subroutine with Displacement (M68010)    
+-- <disp> is a 2's complement integer, 16 bits in size, which is sign extended to 32 bits
+--		before adding to the stack pointer
+				  when "1110100" => --rtd bits[6-0]
+					datatype <= "10";
+					if decodeOPC = '1' then
+					  setnextpass <= '1';
+					  setstate <= "10";
+					  set(postadd) <= '1';
+					  setstackaddr <= '1';
+					  set(direct_delta) <= '1';
+					  set(directPC) <= '1';
+					  next_micro_state <= nopnop;
+					end if;						
+						
+				  when "1110101" => --rts bits[6-0]
 					datatype <= "10";
 					if decodeOPC = '1' then
 					  setstate <= "10";
