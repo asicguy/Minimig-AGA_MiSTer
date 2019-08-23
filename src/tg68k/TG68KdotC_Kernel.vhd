@@ -2162,8 +2162,9 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 --		before adding to the stack pointer
 				  when "1110100" => --rtd bits[6-0]
 					datatype <= "10";
+					set_exec(opcADD) <= '1'; --for displacement
+					set(no_Flags) <= '1';
 					if decodeOPC = '1' then
-					  setnextpass <= '1';
 					  setstate <= "10";
 					  set(postadd) <= '1';
 					  setstackaddr <= '1';
@@ -2901,7 +2902,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		setstate <= "11";
 		next_micro_state <= nopnop;
 		setstackaddr <= '1';
-	  when nopnop => --bsr
+	  when nopnop => --bsr/bra/rts/rtd
 		next_micro_state <= nop;
 
 	  when dbcc1 => --dbcc
