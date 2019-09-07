@@ -182,7 +182,7 @@ architecture logic of TG68KdotC_Kernel is
   signal set_exec_tas           : std_logic;
   signal exe_condition          : std_logic;
   signal ea_only                : bit;
-  signal source_lowbits         : bit;
+  signal source_lowbits         : bit; -- source register is encoded in bits 0-2
   signal source_2ndHbits        : bit;
   signal source_2ndLbits        : bit;
   signal dest_2ndHbits          : bit;
@@ -562,7 +562,7 @@ begin
 	  rf_source_addr <= sndOPC(3 downto 0);
 	elsif source_2ndHbits = '1' then
 	  rf_source_addr <= sndOPC(15 downto 12);
-	elsif source_lowbits = '1' then
+	elsif source_lowbits = '1' then -- source register is encoded in bits 0-2
 	  rf_source_addr <= source_areg & opcode(2 downto 0);
 	elsif exec(linksp) = '1' then
 	  rf_source_addr <= "1111";
@@ -805,6 +805,11 @@ begin
 		  trap_vector(11 downto 0) <= x"0" & "10" & opcode(3 downto 0) & "00";
 		end if;
 
+		--if trap_bkpt = '1' then
+		--	trap_vector(11 downto 0) <= X"010";
+		--	memaddr_a(4 downto 2) <= opcode(2 downto 0);
+		--end if;
+	
 		if trap_interrupt = '1' then
 		  trap_vector(11 downto 0) <= "00" & IPL_vec & "00"; --TH
 		end if;
@@ -1310,7 +1315,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 	set_rot_bits       <= "XX";
 	set_rot_cnt        <= "000001";
 	dest_hbits         <= '0';
-	source_lowbits     <= '0';
+	source_lowbits     <= '0'; -- source register is encoded in bits 0-2
 	source_2ndHbits    <= '0';
 	source_2ndLbits    <= '0';
 	dest_2ndHbits      <= '0';
@@ -1540,7 +1545,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			end if;
 			if opcode(11 downto 9) = "010" or opcode(11 downto 9) = "011" then --SUBI, ADDI
 			  set_exec(opcADD) <= '1';
-			end if;
+			end if;			
 			if opcode(11 downto 9) = "101" then --EorI
 			  set_exec(opcEor) <= '1';
 			end if;
@@ -1607,7 +1612,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		  when "10" => datatype <= "10"; --Long
 		  when others => datatype <= "01"; --Word
 		end case;
-		source_lowbits <= '1'; -- Dn=> An=>
+		source_lowbits <= '1'; -- Dn=> An=> -- source register is encoded in bits 0-2
 		if opcode(3) = '1' then
 		  source_areg <= '1';
 		end if;
@@ -1663,11 +1668,17 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		  end case;
 		end if;
 		---- 0100 ----------------------------------------------------------------------------
-	  when "0100" => --rts_group
+	  when "0100" => --rts_group 15-12
+		if opcode(11 downto 9) = "100" then --BKPT
+			if cpu(1) = '1' then --68020
+				trap_illegal <= '1';
+				trapmake <= '1';
+			end if;
+		end if;
 		if opcode(8) = '1' then --lea
 		  if opcode(6) = '1' then --lea
 			if opcode(7) = '1' then
-			  source_lowbits <= '1';
+			  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 			  -- if opcode(5 downto 3)="000" and opcode(10)='0' then --ext
 			  if opcode(5 downto 4) = "00" then --extb.l
 				set_exec(opcEXT) <= '1';
@@ -1726,7 +1737,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			  set(addsub) <= '1';
 			  if setexecOPC = '1' then
 				dest_hbits <= '1';
-				source_lowbits <= '1';
+				source_lowbits <= '1'; -- source register is encoded in bits 0-2
 			  end if;
 			end if;
 		  end if;
@@ -1756,7 +1767,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 				write_back <= '1';
 				set_exec(opcADD) <= '1';
 				set(addsub) <= '1';
-				source_lowbits <= '1';
+				source_lowbits <= '1'; -- source register is encoded in bits 0-2
 				if opcode(5 downto 4) = "00" then
 				  set_exec(Regwrena) <= '1';
 				end if;
@@ -1797,7 +1808,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			  ea_build_now <= '1';
 			  if opcode(7 downto 6) = "11" then --move to CCR
 				datatype <= "01";
-				source_lowbits <= '1';
+				source_lowbits <= '1'; -- source register is encoded in bits 0-2
 				if (decodeOPC = '1' and opcode(5 downto 4) = "00") or state = "10" or direct_data = '1' then
 				  set(to_CCR) <= '1';
 				end if;
@@ -1805,7 +1816,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 				write_back <= '1';
 				set_exec(opcADD) <= '1';
 				set(addsub) <= '1';
-				source_lowbits <= '1';
+				source_lowbits <= '1'; -- source register is encoded in bits 0-2
 				if opcode(5 downto 4) = "00" then
 				  set_exec(Regwrena) <= '1';
 				end if;
@@ -1818,7 +1829,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 				if SVmode = '1' then
 				  ea_build_now <= '1';
 				  datatype <= "01";
-				  source_lowbits <= '1';
+				  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 				  if (decodeOPC = '1' and opcode(5 downto 4) = "00") or state = "10" or direct_data = '1' then
 					set(to_SR) <= '1';
 					set(to_CCR) <= '1';
@@ -1845,7 +1856,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			when "100" | "110" =>
 			  if opcode(7) = '1' then --movem, ext
 				if opcode(5 downto 3) = "000" and opcode(10) = '0' then --ext
-				  source_lowbits <= '1';
+				  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 				  set_exec(opcEXT) <= '1';
 				  set_exec(opcMOVE) <= '1';
 				  set_exec(Regwrena) <= '1';
@@ -1920,7 +1931,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					if z_error = '0' and set_V_Flag = '0' and set(opcDIVU) = '1' then
 					  set(Regwrena) <= '1';
 					end if;
-					source_lowbits <= '1';
+					source_lowbits <= '1'; -- source register is encoded in bits 0-2
 					if nextpass = '1' or (opcode(5 downto 4) = "00" and decodeOPC = '1') then
 					  dest_hbits <= '1';
 					end if;
@@ -1936,7 +1947,6 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					if opcode(5 downto 3) = "000" then --swap
 					  set_exec(opcSWAP) <= '1';
 					  set_exec(Regwrena) <= '1';
-					elsif opcode(5 downto 3) = "001" then --bkpt
 
 					else --pea
 					  ea_only <= '1';
@@ -1964,7 +1974,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 						set(presub) <= '1';
 						setstackaddr <= '1';
 						set(mem_addsub) <= '1';
-						source_lowbits <= '1';
+						source_lowbits <= '1'; -- source register is encoded in bits 0-2
 						source_areg <= '1';
 						set(store_ea_data) <= '1';
 					  end if;
@@ -1974,7 +1984,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					  write_back <= '1';
 					  set_exec(opcADD) <= '1';
 					  set_exec(opcSBCD) <= '1';
-					  source_lowbits <= '1';
+					  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 					  if opcode(5 downto 4) = "00" then
 						set_exec(Regwrena) <= '1';
 					  end if;
@@ -1993,7 +2003,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			  else
 				ea_build_now <= '1';
 				if setexecOPC = '1' then
-				  source_lowbits <= '1';
+				  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 				  if opcode(3) = '1' then --MC68020...
 					source_areg <= '1';
 				  end if;
@@ -2069,7 +2079,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					  set(presub) <= '1';
 					  setstackaddr <= '1';
 					  set(mem_addsub) <= '1';
-					  source_lowbits <= '1';
+					  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 					  source_areg <= '1';
 					  set(store_ea_data) <= '1';
 					end if;
@@ -2085,7 +2095,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					  set(opcMOVE) <= '1';
 					  set(Regwrena) <= '1';
 					  setstackaddr <= '1';
-					  source_lowbits <= '1';
+					  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 					  source_areg <= '1';
 					end if;
 
@@ -2093,7 +2103,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					if SVmode = '1' then
 					  -- set(no_Flags) <= '1';
 					  set(to_USP) <= '1';
-					  source_lowbits <= '1';
+					  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 					  source_areg <= '1';
 					  datatype <= "10";
 					else
@@ -2157,23 +2167,28 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					  trap_priv <= '1';
 					  trapmake <= '1';
 					end if;
--- RTD #<disp> - Return from Subroutine with Displacement (M68010)    
--- <disp> is a 2's complement integer, 16 bits in size, which is sign extended to 32 bits
---		before adding to the stack pointer
-				  when "1110100" => --rtd bits[6-0]
-					datatype <= "10";
-					set_exec(opcADD) <= '1'; --for displacement
-					set(no_Flags) <= '1';
-					if decodeOPC = '1' then
-					  setstate <= "10";
-					  set(postadd) <= '1';
-					  setstackaddr <= '1';
-					  set(direct_delta) <= '1';
-					  set(directPC) <= '1';
-					  next_micro_state <= nopnop;
+				  -- RTD #<disp> - Return from Subroutine with Displacement (M68010)    
+				  -- <disp> is a 2's complement integer, 16 bits in size, which is sign extended to 32 bits
+				  --		before adding to the stack pointer
+				  when "1110100" => --rtd bits[6-0]?
+				  	if cpu(0) = '1' then --68010 
+						datatype <= "10"; -- has to be long word or PC gets truncated!
+						set_exec(opcADD) <= '1'; --for displacement?
+						--set(no_Flags) <= '1'; -- this command modifies no flags
+						if decodeOPC = '1' then
+							setstate <= "10";
+							set(postadd) <= '1';
+							setstackaddr <= '1';
+							set(direct_delta) <= '1';
+							set(directPC) <= '1';
+							set(OP2out_one) <= '1'; -- what does it do?
+							--sndOPC(15 downto 0)
+							--data_is_source <= '1';
+							next_micro_state <= nopnop;
+						end if;
 					end if;						
 						
-				  when "1110101" => --rts bits[6-0]
+				  when "1110101" => --rts [6-0]
 					datatype <= "10";
 					if decodeOPC = '1' then
 					  setstate <= "10";
@@ -2192,7 +2207,8 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					  trap_trapv <= '1';
 					  trapmake <= '1';
 					end if;
-
+				  -- rtm       32  .     .     000001101100....  ..........  . . U U   .   .  19  19  not properly emulated
+				  --when "100"
 				  when "1111010" | "1111011" => --movec
 					if VBR_Stackframe = 0 or (cpu(0) = '0' and VBR_Stackframe = 2) then
 					  trap_illegal <= '1';
@@ -2235,7 +2251,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		  if opcode(5 downto 3) = "001" then --dbcc
 			if decodeOPC = '1' then
 			  next_micro_state <= dbcc1;
-			  set(OP2out_one) <= '1';
+			  set(OP2out_one) <= '1'; -- 16 bit displacement from OP2 (second instruction word)
 			  data_is_source <= '1';
 			end if;
 		  else --Scc
@@ -2328,7 +2344,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			if z_error = '0' and set_V_Flag = '0' then
 			  set_exec(Regwrena) <= '1';
 			end if;
-			source_lowbits <= '1';
+			source_lowbits <= '1'; -- source register is encoded in bits 0-2
 			if nextpass = '1' or (opcode(5 downto 4) = "00" and decodeOPC = '1') then
 			  dest_hbits <= '1';
 			end if;
@@ -2403,7 +2419,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			datatype <= "01"; --Word
 		  end if;
 		  set_exec(Regwrena) <= '1';
-		  source_lowbits <= '1';
+		  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 		  if opcode(3) = '1' then
 			source_areg <= '1';
 		  end if;
@@ -2435,7 +2451,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		  end if;
 		  set_exec(opcCMP) <= '1';
 		  if setexecOPC = '1' then
-			source_lowbits <= '1';
+			source_lowbits <= '1'; -- source register is encoded in bits 0-2
 			if opcode(3) = '1' then
 			  source_areg <= '1';
 			end if;
@@ -2480,7 +2496,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			end if;
 			ea_build_now <= '1';
 			set_exec(Regwrena) <= '1';
-			source_lowbits <= '1';
+			source_lowbits <= '1'; -- source register is encoded in bits 0-2
 			if (nextpass = '1') or (opcode(5 downto 4) = "00" and decodeOPC = '1') then
 			  dest_hbits <= '1';
 			end if;
@@ -2591,7 +2607,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 				elsif opcode(10 downto 8)="001" or opcode(10 downto 8)="011" or
                                       opcode(10 downto 8)="101" THEN
                                   --BFEXTU, BFEXTS, BFFFO
-				  source_lowbits <= '1';
+				  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 				  dest_2ndHbits <= '1';
 				end if;
 			  end if;
@@ -2635,7 +2651,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		write_back <= '1';
 		set_exec(ea_data_OP1) <= '1';
 	  else
-		source_lowbits <= '1';
+		source_lowbits <= '1'; -- source register is encoded in bits 0-2
 		if opcode(3) = '1' then --use for cmp
 		  source_areg <= '1';
 		end if;
@@ -2650,7 +2666,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 	  set_exec(use_XZFlag) <= '1';
 	  set_exec(ea_data_OP1) <= '1';
 	  write_back <= '1';
-	  source_lowbits <= '1';
+	  source_lowbits <= '1'; -- source register is encoded in bits 0-2
 	  if opcode(3) = '1' then
 		if decodeOPC = '1' then
 		  setstate <= "10";
@@ -3002,7 +3018,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		end if;
 
 	  when trap1 => -- TRAP
-										-- additional word for 68020
+		-- additional word for 68020
 		if trap_interrupt = '1' or trap_trace = '1' then
 		  writePC <= '1';
 		end if;
@@ -3087,25 +3103,25 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		  next_micro_state <= nop;
 		end if;
 	  when rte3 => -- RTE
-										setstate <= "01"; -- idle state to wait
-														  -- for input data to
-														  -- arrive
-										next_micro_state <= rte4;
-					WHEN rte4 =>            -- RTE
-										-- check for stack frame format #2
-										if last_data_in(15 downto 12)="0010" then
-										  -- read another 32 bits in this case
-										 setstate <= "10"; -- read
-										  datatype <= "10"; -- long word
-										  set(postadd) <= '1';
-										  setstackaddr <= '1';
-										  next_micro_state <= rte5;
-										else
-										  datatype <= "01";
+		setstate <= "01"; -- idle state to wait
+							-- for input data to
+							-- arrive
+		next_micro_state <= rte4;
+	  WHEN rte4 =>            -- RTE
+		-- check for stack frame format #2
+		if last_data_in(15 downto 12)="0010" then
+			-- read another 32 bits in this case
+			setstate <= "10"; -- read
+			datatype <= "10"; -- long word
+			set(postadd) <= '1';
+			setstackaddr <= '1';
+			next_micro_state <= rte5;
+		else
+			datatype <= "01";
+			next_micro_state <= nop;
+		end if;
+	  WHEN rte5 =>            -- RTE
 		next_micro_state <= nop;
-										end if;
-					WHEN rte5 =>            -- RTE
-					next_micro_state <= nop;
 	  when movec1 => -- MOVEC
 		set(briefext) <= '1';
 		set_writePCbig <= '1';
