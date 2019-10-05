@@ -531,9 +531,13 @@ begin
 	elsif set(get_bfoffset) = '1' then
 	  rf_dest_addr <= sndOPC(9 downto 6);
 	elsif dest_2ndHbits = '1' then
-	  rf_dest_addr <= sndOPC(15 downto 12);
+	  if opcode(5 downto 3) = "000" then -- Masks out Ax for BFFFO BFEXTS/U MULU.L/DIVU.L as the dests can't be Ax
+	    rf_dest_addr <= '0' & sndOPC(14 downto 12); 
+	  else
+	    rf_dest_addr <= sndOPC(15 downto 12);
+	  end if;
 	elsif set(write_reminder) = '1' then
-	  rf_dest_addr <= sndOPC(3 downto 0);
+	  rf_dest_addr <= '0' & sndOPC(2 downto 0); -- Mask out Ax, otherwise the reminder ends up in Ax
 	elsif setstackaddr = '1' then
 	  rf_dest_addr <= "1111";
 	elsif dest_hbits = '1' then
