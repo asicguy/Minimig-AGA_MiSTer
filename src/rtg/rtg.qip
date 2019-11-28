@@ -1,0 +1,7 @@
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) replay_pack.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) replay_amiga_pack.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) fifo_async.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) ram_dp.vhd ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ram_dp.v ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) replay_amiga_vbe.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) replay_amiga_vde.vhd ]
