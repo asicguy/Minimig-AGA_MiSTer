@@ -184,17 +184,23 @@ pll pll
 (
 	.refclk(CLK_50M),
 	.outclk_0(clk_114),
-	.outclk_1(clk_57),
-	.outclk_2(clk_sys),
+	.outclk_1(clk_sys),
 	.locked(locked)
 );
 
 wire reset = ~locked | buttons[1] | RESET;
 
-reg [7:0] reset_s;
+reg reset_d;
 always @(posedge clk_sys, posedge reset) begin
+	reg [7:0] reset_s;
+	reg rs;
+	
 	if(reset) reset_s <= '1;
-	else reset_s <= reset_s << 1;
+	else begin
+		reset_s <= reset_s << 1;
+		rs <= reset_s[7];
+		reset_d <= rs;
+	end
 end
 
 //// amiga clocks ////
@@ -316,16 +322,13 @@ cpu_wrapper cpu_wrapper
 	.nmi_addr     (cpu_nmi_addr    )
 );
 
-assign SDRAM_CKE = 1;
-assign SDRAM_CLK = clk_57;
-
 wire [15:0] ram_dout1;
 wire        ram_ready1;
 
 sdram_ctrl ram1
 (
 	.sysclk       (clk_114         ),
-	.reset_n      (~reset_s[7]     ),
+	.reset_n      (~reset_d        ),
 	.c_7m         (c1              ),
 
 	.cache_rst    (cpu_rst         ),
@@ -339,6 +342,8 @@ sdram_ctrl ram1
 	.sd_we        (SDRAM_nWE       ),
 	.sd_ras       (SDRAM_nRAS      ),
 	.sd_cas       (SDRAM_nCAS      ),
+	.sd_cke       (SDRAM_CKE       ),
+	.sd_clk       (SDRAM_CLK       ),
 
 	.cpuWR        (ram_din         ),
 	.cpuAddr      (ram_addr[22:1]  ),
@@ -364,7 +369,7 @@ wire        ram_ready2;
 ddram_ctrl ram2
 (
 	.sysclk       (clk_114         ),
-	.reset_n      (~reset_s[7]     ),
+	.reset_n      (~reset_d        ),
 
 	.cache_rst    (cpu_rst         ),
 	.cpu_cache_ctrl(cpu_cacr       ),
@@ -437,7 +442,7 @@ minimig minimig
 	.chip48       (chip48           ), // big chipram read
 
 	//system  pins
-	.rst_ext      (reset_s[7]       ), // reset from ctrl block
+	.rst_ext      (reset_d          ), // reset from ctrl block
 	.rst_out      (                 ), // minimig reset status
 	.clk          (clk_sys          ), // output clock c1 ( 28.687500MHz)
 	.clk7_en      (clk7_en          ), // 7MHz clock enable
